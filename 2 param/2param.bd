@@ -1,0 +1,2 @@
+App.User(S First, S Last)
+   S Name = $"{First} {Last}"
