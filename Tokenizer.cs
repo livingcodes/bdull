@@ -1,50 +1,158 @@
-namespace bdull;
+namespace BDull;
 public class Tokenizer
 {
-   public List<object> Tokenize(string text) {
-      var line = text.Contains("\r\n") 
-         ? text.Substring(0, text.IndexOf("\r\n")) 
-         : text;
-   
-      var tokens = new List<object>();
-      // tokenize
-      var dot = line.IndexOf(".");
-      var ns = line.Substring(0, dot);
-      tokens.Add(new Namespace(ns));
-   
-      var next = dot+1;
-      var paren = line.IndexOf("(");
-
-      var cl = line.Substring(next, paren-next);
-      tokens.Add(new Class(cl));
-      tokens.Add(new OpenParen());
-
-      next = paren+1;
-      next = readParam(line, next, tokens);
-      
-      var nextChar = line.Substring(next, 1);
-      if (nextChar == ",") {
-         next += 1;
-         next = skipWs(line, next);
-         next = readParam(line, next, tokens);
+   public List<IToken> Tokenize(string /*bdull*/code) {
+      var tokens = new List<IToken>();
+      var i = 0;
+      var endOfFile = GetEndOfFile(code, i);
+      if (endOfFile != null) {
+         tokens.Add(endOfFile);
+         return tokens;
       }
-      
-      tokens.Add(new CloseParen());
 
+      (var ns, var cl, i) = GetClass(code, i);
+      if (ns != null)
+         tokens.Add(ns);
+      tokens.Add(cl);
+
+      endOfFile = GetEndOfFile(code, i);
+      if (endOfFile != null)
+         return tokens;
+      
+      if (code[i] != '(')
+         throw new Exception("Expected (. Actual " + code[i]);
+      else
+         tokens.Add(new OpenParen());
+
+      i+=1;
+      
+      (var parameters, i) = GetParams(code, i);
+      foreach (var p in parameters)
+         tokens.Add(p);
+      
       return tokens;
+   }
+   
+   IToken GetEndOfFile(string code, int i) {
+      if (code.Length <= i)
+         return new EndOfFile();
+      return null;
+   }
+   
+   public (Namespace ns, Class cl, int nx) GetClass(string code, int i) {
+      var endOfFile = GetEndOfFile(code, i);
+      if (endOfFile != null)
+         throw new Exception("Expected class. Actual end of file");
+      
+      var tokens = new List<IToken>();
+      var identifiers = new List<string>();
+      var word = "";
+      do {
+         if (i >= code.Length) {
+            identifiers.Add(word);
+            break;
+         }
+
+         var ch = code[i];
+         
+         // alpha, append letter
+         if (IsAlpha(code, i))
+            word += ch;
+
+         // dot, append token
+         if (ch == '.') {
+            identifiers.Add(word);
+            word = "";
+         }
+
+         // open paren, return
+         if (ch == '(') {
+            identifiers.Add(word);
+            break;
+         }
+         i++;
+      } while (true);
+
+      if (identifiers.Count == 1) {
+         var cl = new Class(identifiers[0]);
+         return (null, cl, i);
+      }
+      else {
+
+         var ns = "";
+         for (var j=0; j<identifiers.Count; j++) {
+            var isLast = j == identifiers.Count-1;
+            if (isLast) {
+               ns = ns.Substring(0, ns.Length-1);
+               var n = new Namespace(ns);
+               var c = new Class(identifiers[j]);
+               return (n, c, i);
+            }
+            ns += identifiers[j] + ".";
+         }
+      }
+      return (null, null, i);
+   }
+
+   public (List<IToken>, int) GetParams(string code, int i) {
+      var tokens = new List<IToken>();
+      do {
+         i = skipWs(code, i);
+         (var paramType, i) = GetParamType(code, i);
+         i = skipWs(code, i);
+         (var paramName, i) = GetParamName(code, i);
+         i = skipWs(code, i);
+         tokens.Add(paramType);
+         tokens.Add(paramName);
+         if (code[i] == ',') {
+            tokens.Add(new Comma());
+            i+=1;
+         }
+      } while(code[i] != ')');
+      return (tokens, i);
+   }
+
+   (ParamType, int) GetParamType(string code, int i) {
+      i = skipWs(code, i);
+      (var text, i) = ReadAlphaUntil(code, i, ' ');
+      return (new ParamType(text), i);
+   }
+
+   (ParamName, int) GetParamName(string code, int i) {
+      i = skipWs(code, i);
+      (var text, i) = ReadAlphaUntil(code, i, ',', ')');
+      return (new ParamName(text), i);
+   }
+
+   (string, int) ReadAlphaUntil(string code, int i, params char[] ch) {
+      var word = "";
+      do {
+         if (ch.Contains(code[i]))
+            return (word, i);
+         if (!IsAlpha(code, i))
+            throw new Exception("Expected alpha. Actual " + code[i]);
+         word += code[i];
+         i++;
+      } while(true);
+   }
+
+   bool IsAlpha(string code, int i) {
+      var isAlpha = System.Text.RegularExpressions.
+         Regex.IsMatch(code[i].ToString(), "^[a-z|A-Z]{1}$");
+      return isAlpha;
    }
 
    int readParam(string line, int next, List<object> tokens) {
       var ws = line.IndexOf(' ', next);
       var paramType = line.Substring(next, ws-next);
-      tokens.Add(new Type(paramType));
+      tokens.Add(new ParamType(paramType));
 
       next = ws+1;
       var endParen = line.IndexOf(")", next);
       var comma = line.IndexOf(',', next);
       var afterVarName = comma > -1 ? comma : endParen;
       var varName = line.Substring(next, afterVarName-next);
-      tokens.Add(new VarName(varName));
+      tokens.Add(new ParamName(varName));
       return afterVarName;
    }
 

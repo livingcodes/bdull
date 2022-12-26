@@ -1,7 +1,7 @@
-namespace bdull;
+namespace BDull;
 class Compiler
 {
-   public (string il, string ns) Compile(List<object> tokens) {
+   public (string il, string ns) Compile(List<IToken> tokens) {
       var t = "   ";
 
       var output = "";
@@ -20,13 +20,15 @@ class Compiler
       if (tokens.Count > 2 && tokens[2].GetType() == typeof(OpenParen)) {
          var nextToken = 3;
          var parameters = new List<(string t, string n)>();
-         while (tokens[nextToken].GetType() == typeof(Type)) {
-            var paramType = ((Type)tokens[nextToken]).Value;
+         while (tokens[nextToken].GetType() == typeof(ParamType)) {
+            var paramType = ((ParamType)tokens[nextToken]).Value;
             paramType = ConvertType(paramType);
-            var varName = ((VarName)tokens[nextToken+1]).Value;
+            var varName = ((ParamName)tokens[nextToken+1]).Value;
             parameters.Add((paramType, varName));
             output += "\r\n" + $"{t}.field public initonly {paramType} {varName}";
             nextToken += 2;
+            if (nextToken > tokens.Count-1)
+               break;
             if (tokens[nextToken].GetType() == typeof(Comma))
                nextToken += 1;
          }
