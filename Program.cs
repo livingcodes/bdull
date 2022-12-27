@@ -15,7 +15,7 @@ public class Program
       // var path = root + @"2param.bd";
       
       // var code = System.IO.File.ReadAllText(path);
-      var code = "App.Auth.User(S First, S Last)";
+      var code = "App.Auth.User(+S First, S Last, -I age)";
       var tokens = new Tokenizer().Tokenize(code);
       var (il, ns) = new Compiler().Compile(tokens);
 
@@ -24,7 +24,7 @@ public class Program
       if (input == "w")
          Console.WriteLine(il);
       else if (input == "f") {
-         System.IO.File.WriteAllText($"{root}{ns}.il", il);
+         File.WriteAllText($"{root}{ns}.il", il);
          Console.WriteLine($"Wrote file {root}{ns}.il");
       }
       else

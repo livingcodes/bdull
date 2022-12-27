@@ -1,70 +1,143 @@
 namespace BDull;
-class Compiler
-{
-   public (string il, string ns) Compile(List<IToken> tokens) {
-      var t = "   ";
+class Compiler {
+   int c = 0; // cursor of tokens
+   int Next() => c = c + 1;
 
-      var output = "";
-      output += @"// IL from BDull
+   string t = "   "; // tab
+   string il;
+   void Line(string line, int tabs = 0) {
+      for (var i=0; i<tabs; i++)
+         il += t;
+      il += line + "\r\n";
+   }
+   void Append(string text) => il += text;
+
+   public (string il, string ns) Compile(List<IToken> tokens) {
+      if (tokens[c] is EndOfFile)
+         return ("", "");
+
+      string ns = null;
+      if (tokens[c] is Namespace n)
+         ns = n.Value;
+      else
+         throwExpected<Namespace>();
+
+      Next();
+
+      string cl = null;
+      if (tokens[c] is Class cls)
+         cl = cls.Value;
+      else
+         throwExpected<Class>();
+
+      Next();
+
+      Line(@"// IL from BDull
 .assembly extern System.Runtime {
    .publickeytoken = (B0 3F 5F 7F 11 D5 0A 3A )
    .ver 7:0:0:0
-}";
+}");
+      Line($".assembly {ns} {{}}");
+      Line($".module {ns}.dll");
+      Line($".class public auto ansi beforefieldinit {ns}.{cl}");
+      Line("{");
 
-      var ns = ((Namespace)tokens.First()).Value;
-      var cl = ((Class)tokens[1]).Value;
-      output += "\r\n" + $".assembly {ns} {{}}";
-      output += "\r\n" + $".module {ns}.dll";
-      output += "\r\n" + $".class public auto ansi beforefieldinit {ns}.{cl}";
-      output += "\r\n" + "{";
-      if (tokens.Count > 2 && tokens[2].GetType() == typeof(OpenParen)) {
-         var nextToken = 3;
+      if (tokens[c] is EndOfFile) {
+         Line("}");
+         return (il, ns);
+      }
+
+      if (tokens[c] is OpenParen) {
+         Next();
          var parameters = new List<(string t, string n)>();
-         while (tokens[nextToken].GetType() == typeof(ParamType)) {
-            var paramType = ((ParamType)tokens[nextToken]).Value;
-            paramType = ConvertType(paramType);
-            var varName = ((ParamName)tokens[nextToken+1]).Value;
-            parameters.Add((paramType, varName));
-            output += "\r\n" + $"{t}.field public initonly {paramType} {varName}";
-            nextToken += 2;
-            if (nextToken > tokens.Count-1)
+         do {
+            if (tokens[c] is CloseParen) {
+               Next();
                break;
-            if (tokens[nextToken].GetType() == typeof(Comma))
-               nextToken += 1;
-         }
-      
-         output += "\r\n" + "";
-         output += "\r\n" + $"{t}.method public hidebysig specialname rtspecialname instance void";
-         output += "\r\n" + $"{t}.ctor(";
+            }
+            if (!(tokens[c] is Accessor or ParamType))
+               throwExpected<ParamType>();
+
+            string ac = "";
+            if (tokens[c] is Accessor a) {
+               ac = a.Value;
+               Next();
+            }
+            string pt = "";
+            if (tokens[c] is ParamType p) {
+               pt = p.Value;
+               Next();
+            }
+            else
+               throwExpected<ParamType>();
+            
+            string pn = "";
+            if (tokens[c] is ParamName pp) {
+               pn = pp.Value;
+               Next();
+            }
+            else
+               throwExpected<ParamName>();
+
+            pt = ConvertType(pt);
+            ac = ConvertAccessor(ac);
+            parameters.Add((pt, pn));
+            Line($".field {ac} initonly {pt} {pn}", 1);
+
+            if (tokens[c] is Comma)
+               Next();
+
+         } while (true);
+
+         Line("", 1);
+         Line($".method public hidebysig specialname rtspecialname instance void", 1);
+         Line($".ctor(", 1);
+
          var i = 0;
          foreach (var p in parameters) {
-            output += $"\r\n{t}{t}{p.t} {p.n}";
             i += 1;
-            if (i < parameters.Count)
-               output += ",";
+            var comma = (i < parameters.Count) ? "," : "";
+            Line($"{p.t} {p.n}{comma}", 2);
          }
-         output += "\r\n" + $"{t}) cil managed {{";
-         output += "\r\n" + $"{t}{t}.maxstack 4";
+         Line($") cil managed {{", 1);
+         Line($".maxstack 4", 2);
          i = 0;
          foreach (var p in parameters) {
             i += 1;
-            output += "\r\n" + $"{t}{t}ldarg.0 // this";
-            output += "\r\n" + $"{t}{t}ldarg.{i}";
-            output += "\r\n" + $"{t}{t}stfld {p.t} {ns}.{cl}::{p.n}";
+            Line($"ldarg.0 // this", 2);
+            Line($"ldarg.{i}", 2);
+            Line($"stfld {p.t} {ns}.{cl}::{p.n}", 2);
          }
-         output += "\r\n" + $"{t}{t}nop";
-         output += "\r\n" + $"{t}{t}ret";
-         output += "\r\n" + $"{t}}}";
-      
+         Line($"nop", 2);
+         Line($"ret", 2);
+         Line("}", 1);
       }
-      output += "\r\n" + "}";
-      return (output, ns);
+      Line("}");
+      return (il, ns);
    }
 
    string ConvertType(string bdType) {
-      var csType = bdType == "S"
-         ? "string"
+      var csType = 
+         bdType == "S"
+            ? "string"
+         : bdType == "I"
+            ? "int32"
          : throw new Exception($"Type not recognized: {bdType}");
       return csType;
    }
+
+   string ConvertAccessor(string bdAccessor) {
+      var csAccessor =
+         bdAccessor == ""
+            ? "public"
+         : bdAccessor == "+"
+            ? "public"
+         : bdAccessor == "-"
+            ? "private"
+         : throw new CompilerEx($"Accessor not recognized: {bdAccessor}");
+      return csAccessor;
+   }
+
+   void throwExpected<T>() =>
+      throw new CompilerEx($"Expected {nameof(T)}.");
 }

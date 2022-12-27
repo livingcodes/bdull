@@ -4,11 +4,11 @@ public class Tokenizer
    public List<IToken> Tokenize(string /*bdull*/code) {
       var tokens = new List<IToken>();
       var i = 0;
+
       var endOfFile = GetEndOfFile(code, i);
       if (endOfFile != null) {
          tokens.Add(endOfFile);
-         return tokens;
-      }
+         return tokens; }
 
       (var ns, var cl, i) = GetClass(code, i);
       if (ns != null)
@@ -29,7 +29,12 @@ public class Tokenizer
       (var parameters, i) = GetParams(code, i);
       foreach (var p in parameters)
          tokens.Add(p);
-      
+
+      if (code[i] == ')')
+         tokens.Add(new CloseParen());
+      else
+         throw new Exception("Expected ). Actual " + code[i]);
+
       return tokens;
    }
    
@@ -98,10 +103,14 @@ public class Tokenizer
       var tokens = new List<IToken>();
       do {
          i = skipWs(code, i);
+         (var paramAccessor, i) = GetAccessor(code, i);
+         i = skipWs(code, i);
          (var paramType, i) = GetParamType(code, i);
          i = skipWs(code, i);
          (var paramName, i) = GetParamName(code, i);
          i = skipWs(code, i);
+         if (paramAccessor != null)
+            tokens.Add(paramAccessor);
          tokens.Add(paramType);
          tokens.Add(paramName);
          if (code[i] == ',') {
@@ -110,6 +119,19 @@ public class Tokenizer
          }
       } while(code[i] != ')');
       return (tokens, i);
+   }
+
+   (Accessor, int) GetAccessor(string code, int i) {
+      i = skipWs(code, i);
+      string text = "";
+      if (code[i] == '+' || code[i] == '-') {
+         text = code[i].ToString();
+         i+=1;
+      }
+      var accessor = text != "" 
+         ? new Accessor(text) 
+         : null;
+      return (accessor, i);
    }
 
    (ParamType, int) GetParamType(string code, int i) {

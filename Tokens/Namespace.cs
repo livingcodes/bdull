@@ -11,4 +11,7 @@ public record ParamType(string Value) : IToken;
 public record ParamName(string Value) : IToken;
 public record Comma() : IToken;
 public record EndOfFile() : IToken;
+public record Accessor(string Value) : IToken {
+   public override string ToString() => Value;
+}
 public interface IToken {}
