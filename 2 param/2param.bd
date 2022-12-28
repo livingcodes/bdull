@@ -1,3 +1,5 @@
-App.User(+S First, -S Last)
+﻿App.User(+S First, -S Last)
+   💬 todo: Set name
    +S Name
+   💬 Set age
    +I Age

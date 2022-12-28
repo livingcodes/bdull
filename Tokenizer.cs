@@ -1,4 +1,4 @@
-namespace BDull;
+﻿namespace BDull;
 public class Tokenizer
 {
    public List<IToken> Tokenize(string /*bdull*/code) {
@@ -9,6 +9,8 @@ public class Tokenizer
       if (endOfFile != null) {
          tokens.Add(endOfFile);
          return tokens; }
+
+      i = GetComments(code, i, tokens);
 
       (var ns, var cl, i) = GetClass(code, i);
       if (ns != null)
@@ -49,6 +51,8 @@ public class Tokenizer
 
       // +S Name
       do {
+         i = GetComments(code, i, tokens);
+
          (var accessor, i) = GetAccessor(code, i);
          if (accessor != null)
             tokens.Add(accessor);
@@ -81,6 +85,27 @@ public class Tokenizer
       if (code.Length <= i)
          return new EndOfFile();
       return null;
+   }
+
+   (Comment c, int i) GetComment(string code, int i) {
+      i = skipWs(code, i);
+      if (!(code[i].ToString() == "\ud83d" 
+      && code[i+1].ToString() == "\udcac")) // 💬
+         return (null, i);
+      i += 2;
+      (var comment, i) = ReadUntil(code, i, '\r', '\n');
+      (_, i) = skipReturn(code, i);
+      return (new Comment(comment), i);
+   }
+
+   int GetComments(string code, int i, List<IToken> tokens) {
+      Comment comment;
+      do {
+         (comment, i) = GetComment(code, i);
+         if (comment != null)
+            tokens.Add(comment);
+      } while (comment != null);
+      return i;
    }
    
    public (Namespace ns, Class cl, int nx) GetClass(string code, int i) {
@@ -201,6 +226,16 @@ public class Tokenizer
          word += code[i];
          i++;
       } while(true);
+   }
+
+   (string, int) ReadUntil(string code, int i, params char[] ch) {
+      var word = "";
+      do {
+         if (code.Length <= i || ch.Contains(code[i]))
+            return (word, i);
+         word += code[i];
+         i++;
+      } while (true);
    }
 
    bool IsAlpha(string code, int i) {

@@ -1,3 +1,4 @@
+//  todo: set last name
 // IL from BDull
 .assembly extern System.Runtime {
    .publickeytoken = (B0 3F 5F 7F 11 D5 0A 3A )
@@ -25,6 +26,8 @@
       nop
       ret
    }
+
+//  First + Last
    .field public string Name
    .field public int32 Age
 }

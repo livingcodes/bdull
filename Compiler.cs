@@ -1,5 +1,6 @@
 namespace BDull;
 class Compiler {
+   List<IToken> tokens = null;
    int c = 0; // cursor of tokens
    int Next() => c = c + 1;
 
@@ -13,8 +14,14 @@ class Compiler {
    void Append(string text) => il += text;
 
    public (string il, string ns) Compile(List<IToken> tokens) {
+      this.tokens = tokens;
       if (tokens[c] is EndOfFile)
          return ("", "");
+
+      while (tokens[c] is Comment cm) {
+         Line($"// {cm.Value}");
+         Next();
+      }
 
       string ns = null;
       if (tokens[c] is Namespace n)
@@ -115,6 +122,8 @@ class Compiler {
       Line("");
       // fields
       do {
+         Comments();
+
          if (!(tokens[c] is Accessor or ParamType))
             throwExpected<ParamType>();
 
@@ -145,6 +154,18 @@ class Compiler {
       } while (true);
       Line("}");
       return (il, ns);
+   }
+
+   void Comments() {
+      Comment cm = null;
+      do {
+         if (tokens[c] is Comment) {
+            cm = (Comment)tokens[c];
+            Line($"// {cm.Value}");
+            Next();
+         } else
+            cm = null;
+      } while (cm != null);
    }
 
    string ConvertType(string bdType) {
