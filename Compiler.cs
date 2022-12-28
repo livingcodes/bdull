@@ -112,6 +112,37 @@ class Compiler {
          Line($"ret", 2);
          Line("}", 1);
       }
+      Line("");
+      // fields
+      do {
+         if (!(tokens[c] is Accessor or ParamType))
+            throwExpected<ParamType>();
+
+         string ac2 = "";
+         if (tokens[c] is Accessor a2) {
+            ac2 = a2.Value;
+            Next();
+         }
+         string pt2 = "";
+         if (tokens[c] is ParamType p2) {
+            pt2 = p2.Value;
+            Next();
+         } else
+            throwExpected<ParamType>();
+         string pn2 = "";
+         if (tokens[c] is ParamName pp2) {
+            pn2 = pp2.Value;
+            Next();
+         } else
+            throwExpected<ParamName>();
+
+         pt2 = ConvertType(pt2);
+         ac2 = ConvertAccessor(ac2);
+         Line($".field {ac2} {pt2} {pn2}", 1);
+
+         if (tokens.Count <= c || tokens[c] is EndOfFile)
+            break;
+      } while (true);
       Line("}");
       return (il, ns);
    }

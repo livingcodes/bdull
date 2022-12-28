@@ -1,2 +1,3 @@
-App.User(S First, S Last)
-   S Name = $"{First} {Last}"
+App.User(+S First, -S Last)
+   +S Name
+   +I Age

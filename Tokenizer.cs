@@ -16,8 +16,10 @@ public class Tokenizer
       tokens.Add(cl);
 
       endOfFile = GetEndOfFile(code, i);
-      if (endOfFile != null)
+      if (endOfFile != null) {
+         tokens.Add(endOfFile);
          return tokens;
+      }
       
       if (code[i] != '(')
          throw new Exception("Expected (. Actual " + code[i]);
@@ -35,6 +37,43 @@ public class Tokenizer
       else
          throw new Exception("Expected ). Actual " + code[i]);
 
+      i+=1;
+
+      var eof = GetEndOfFile(code, i);
+      if (eof != null) {
+         tokens.Add(eof);
+         return tokens; }
+
+      i = skipWs(code, i);
+      (var f, i) = skipReturn(code, i);
+
+      // +S Name
+      do {
+         (var accessor, i) = GetAccessor(code, i);
+         if (accessor != null)
+            tokens.Add(accessor);
+
+         (var fieldType, i) = GetParamType(code, i);
+         if (fieldType != null)
+            tokens.Add(fieldType);
+         else
+            throw new Exception("Expected param type");
+
+         (var fieldName, i) = GetFieldName(code, i);
+         if (fieldName != null)
+            tokens.Add(fieldName);
+         else
+            throw new Exception("Expected param name");
+
+         eof = GetEndOfFile(code, i);
+         if (eof != null) {
+            tokens.Add(eof);
+            return tokens; }
+
+         (f, i) = skipReturn(code, i);
+         if (!f)
+            break;
+      } while (true);
       return tokens;
    }
    
@@ -128,8 +167,8 @@ public class Tokenizer
          text = code[i].ToString();
          i+=1;
       }
-      var accessor = text != "" 
-         ? new Accessor(text) 
+      var accessor = text != ""
+         ? new Accessor(text)
          : null;
       return (accessor, i);
    }
@@ -146,10 +185,16 @@ public class Tokenizer
       return (new ParamName(text), i);
    }
 
+   (ParamName, int) GetFieldName(string code, int i) {
+      i = skipWs(code, i);
+      (var text, i) = ReadAlphaUntil(code, i, ' ', '\r', '\n');
+      return (new ParamName(text), i);
+   }
+
    (string, int) ReadAlphaUntil(string code, int i, params char[] ch) {
       var word = "";
       do {
-         if (ch.Contains(code[i]))
+         if (code.Length <= i || ch.Contains(code[i]))
             return (word, i);
          if (!IsAlpha(code, i))
             throw new Exception("Expected alpha. Actual " + code[i]);
@@ -179,9 +224,17 @@ public class Tokenizer
    }
 
    int skipWs(string line, int next) {
-      while (line[next] == ' ') {
+      while (line[next] == ' ')
          next += 1;
-      }
       return next;
+   }
+
+   (bool, int) skipReturn(string code, int i) {
+      var found = false;
+      while (code[i] == '\r' || code[i] == '\n') {
+         i += 1;
+         found = true;
+      }
+      return (found, i);
    }
 }

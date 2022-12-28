@@ -8,8 +8,8 @@
 .class public auto ansi beforefieldinit App.User
 {
    .field public initonly string First
-   .field public initonly string Last
-
+   .field private initonly string Last
+   
    .method public hidebysig specialname rtspecialname instance void
    .ctor(
       string First,
@@ -25,4 +25,6 @@
       nop
       ret
    }
+   .field public string Name
+   .field public int32 Age
 }
