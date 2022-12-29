@@ -18,7 +18,7 @@ public record Accessor(string Value) : IToken {
 public record IntegerValue(int Value) : IToken {
    public override string ToString() => Value.ToString();
 }
-public record StringValue(string Value) : IToken {
+public record StringValue(string Value, List<(ConcatType, string)> Concats) : IToken {
    public override string ToString() => Value;
 }
 public record Comment(string Value) : IToken {

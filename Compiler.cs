@@ -57,7 +57,7 @@ class Compiler {
       if (tokens[c] is OpenParen) {
          Next();
          var parameters = new List<(string t, string n)>();
-         var initializedFields = new List<(string t, string n, string v)>();
+         var initializedFields = new List<(string t, string n, string v, List<(ConcatType ct, string cv)> c)>();
          do {
             if (tokens[c] is CloseParen) {
                Next();
@@ -132,11 +132,11 @@ class Compiler {
                Next();
 
                if (tokens[c] is IntegerValue iv) {
-                  initializedFields.Add((pt2, pn2, iv.Value.ToString()));
+                  initializedFields.Add((pt2, pn2, iv.Value.ToString(), null));
                   Next();
                }
                else if (tokens[c] is StringValue sv) {
-                  initializedFields.Add((pt2, pn2, sv.Value));
+                  initializedFields.Add((pt2, pn2, sv.Value, sv.Concats));
                   Next();
                }
                else {
@@ -159,7 +159,7 @@ class Compiler {
             Line($"{p.t} {p.n}{comma}", 2);
          }
          Line($") cil managed {{", 1);
-         Line($".maxstack 4", 2);
+         Line($".maxstack 8", 2);
          i = 0;
          foreach (var p in parameters) {
             i += 1;
@@ -174,8 +174,28 @@ class Compiler {
                Line($"stfld {f.t} {ns}.{cl}::{f.n}", 2);
             }
             else if (f.t == "string") {
-               Line($"ldstr \"{f.v}\"", 2);
-               Line($"stfld {f.t} {ns}.{cl}::{f.n}", 2);
+               if (f.c.Count == 0) {
+                  Line($"ldstr \"{f.v}\"", 2);
+                  Line($"stfld {f.t} {ns}.{cl}::{f.n}", 2);
+               }
+               else {
+                  var pt = "";
+                  Line("// concats", 2);
+                  foreach (var c in f.c) {
+                     if (c.ct == ConcatType.Variable) {
+                        Line("ldarg.0", 2);
+                        Line($"ldfld {f.t} {ns}.{cl}::{c.cv}", 2);
+                     }
+                     else if (c.ct == ConcatType.Literal) {
+                        Line($"ldstr \"{c.cv}\"", 2);
+                     }
+                     pt += "string, ";
+                  }
+                  pt = pt.Substring(0, pt.Length - 2);
+                  Line($"call string [System.Runtime]System.String::Concat({pt})", 2);
+                  Line($"stfld {f.t} {ns}.{cl}::{f.n}", 2);
+                  Line("");
+               }
             }
             else {
                throw new CompilerEx($"Unknown type of initialized field. Actual {f.t}");

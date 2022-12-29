@@ -1,11 +1,11 @@
-namespace BDull.Tests;
+﻿namespace BDull.Tests;
 
 [TestClass]
 public class TokenizerTests
 {
     [TestMethod]
     public void NsClass() {
-        var tk = new BDull.Tokenizer();
+        var tk = new Tokenizer();
         var (ns, cl, nx) = tk.GetClass("App.User", 0);
         assert(ns.Value == "App");
         assert(cl.Value == "User");
@@ -13,7 +13,7 @@ public class TokenizerTests
 
     [TestMethod]
     public void WParam() {
-        var tk = new BDull.Tokenizer();
+        var tk = new Tokenizer();
         var tks = tk.Tokenize("App.Auth.User(S First)");
         assert(tks[0] is Namespace ns && ns.Value == "App.Auth");
         assert(tks[1] is Class cl && cl.Value == "User");
@@ -22,7 +22,33 @@ public class TokenizerTests
         assert(tks[4] is ParamName pn && pn.Value == "First");
     }
 
-    void assert(bool condition) {
+   [TestMethod]
+   public void Concats() {
+      var str = "👉First 👉Last";
+      var tk = new Tokenizer();
+      var list = tk.GetConcats(str);
+      assert(list[0].t == ConcatType.Variable);
+      assert(list[0].v == "First");
+      assert(list[1].t == ConcatType.Literal);
+      assert(list[1].v == " ");
+      assert(list[2].t == ConcatType.Variable);
+      assert(list[2].v == "Last");
+   }
+
+   [TestMethod]
+   public void Concats2() {
+      var str = "Hello 👉First, How are you?";
+      var tk = new Tokenizer();
+      var list = tk.GetConcats(str);
+      assert(list[0].t == ConcatType.Literal);
+      assert(list[0].v == "Hello ");
+      assert(list[1].t == ConcatType.Variable);
+      assert(list[1].v == "First");
+      assert(list[2].t == ConcatType.Literal);
+      assert(list[2].v == ", How are you?");
+   }
+
+   void assert(bool condition) {
         Assert.IsTrue(condition);
     }
 }

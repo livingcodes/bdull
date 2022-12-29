@@ -7,7 +7,7 @@ public class Tokenizer
       var tokens = new List<IToken>();
       var i = 0;
 
-      var endOfFile = GetEndOfFile(code, i);
+      var endOfFile = GetEof(code, i);
       if (endOfFile != null) {
          tokens.Add(endOfFile);
          return tokens; }
@@ -19,7 +19,7 @@ public class Tokenizer
          tokens.Add(ns);
       tokens.Add(cl);
 
-      endOfFile = GetEndOfFile(code, i);
+      endOfFile = GetEof(code, i);
       if (endOfFile != null) {
          tokens.Add(endOfFile);
          return tokens;
@@ -43,7 +43,7 @@ public class Tokenizer
 
       i+=1;
 
-      var eof = GetEndOfFile(code, i);
+      var eof = GetEof(code, i);
       if (eof != null) {
          tokens.Add(eof);
          return tokens; }
@@ -76,20 +76,19 @@ public class Tokenizer
             tokens.Add(equal);
             i = skipWs(code, i);
             if (fieldType.Value == "I") {
-               //tokens.Add(new ParamType(fieldType.Value));
                (int num, i) = GetI(code, i);
                tokens.Add(new IntegerValue(num));
             }
             else if (fieldType.Value == "S") {
-               //tokens.Add(new ParamType(fieldType.Value));
                (string str, i) = GetS(code, i);
-               tokens.Add(new StringValue(str));
+               var concats = GetConcats(str);
+               tokens.Add(new StringValue(str, concats));
             }
             else
                throw new Exception($"Expected type. Actual {code[i]}");
          }
 
-         eof = GetEndOfFile(code, i);
+         eof = GetEof(code, i);
          if (eof != null) {
             tokens.Add(eof);
             return tokens; }
@@ -100,12 +99,13 @@ public class Tokenizer
       } while (true);
       return tokens;
    }
-   
-   IToken GetEndOfFile(string code, int i) {
-      if (code.Length <= i)
-         return new EndOfFile();
-      return null;
-   }
+
+   IToken GetEof(string code, int i) =>
+      IsEof(code, i)
+         ? new EndOfFile()
+         : null;
+   bool IsEof(string code, int i) =>
+      code.Length <= i;
 
    (Comment c, int i) GetComment(string code, int i) {
       i = skipWs(code, i);
@@ -129,7 +129,7 @@ public class Tokenizer
    }
    
    public (Namespace ns, Class cl, int nx) GetClass(string code, int i) {
-      var endOfFile = GetEndOfFile(code, i);
+      var endOfFile = GetEof(code, i);
       if (endOfFile != null)
          throw new Exception("Expected class. Actual end of file");
       
@@ -257,6 +257,17 @@ public class Tokenizer
       } while(true);
    }
 
+   (string, int) ReadVariableName(string code, int i) {
+      var word = "";
+      do {
+         if (IsEof(code, i) || !IsAlpha(code, i))
+            return (word, i);
+
+         word += code[i];
+         i++;
+      } while (true);
+   }
+
    (string, int) ReadUntil(string code, int i, params char[] ch) {
       var word = "";
       do {
@@ -289,13 +300,30 @@ public class Tokenizer
          throw new Exception($"Expected double quote. Actual {code[i]}");
 
       (str, i) = ReadUntil(code, i, '"');
-
-      if (code[i] == '"')
+      if (!IsEof(code, i) && code[i] == '"')
          i++;
       else
          throw new Exception($"Expected double quote. Actual {code[i]}");
 
       return (str, i);
+   }
+
+   public List<(ConcatType t, string v)> GetConcats(string str) {
+      var list = new List<(ConcatType, string)>();
+      var st = 0;
+      var ch = "\ud83d\udc49"; // 👉
+      while (str.IndexOf(ch, st) > -1) {
+         // " 👉First 👉Last"
+         var prevEnd = st;
+         st = str.IndexOf(ch, prevEnd);
+         if (st > 0 && st > prevEnd)
+            list.Add((ConcatType.Literal, str.Substring(prevEnd, st - prevEnd)));
+         (var vn, st) = ReadVariableName(str, st+2);
+         list.Add((ConcatType.Variable, vn));
+      }
+      if (str.Length-1 >= st)
+         list.Add((ConcatType.Literal, str.Substring(st)));
+      return list;
    }
 
    bool IsAlpha(string code, int i) {
