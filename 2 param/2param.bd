@@ -1,5 +1,5 @@
-﻿App.User(+S First, -S Last)
-   💬 todo: Set name
-   +S Name
-   💬 Set age
-   +I Age
+﻿💬 todo: Date type
+App.User(+S First, -S Last)
+   💬 todo: Set name to $"{First} {Last}"
+   +S Name = "John Doe"
+   +I Age = 3

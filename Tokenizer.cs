@@ -1,4 +1,6 @@
-﻿namespace BDull;
+﻿using System.Text.RegularExpressions;
+
+namespace BDull;
 public class Tokenizer
 {
    public List<IToken> Tokenize(string /*bdull*/code) {
@@ -49,7 +51,7 @@ public class Tokenizer
       i = skipWs(code, i);
       (var f, i) = skipReturn(code, i);
 
-      // +S Name
+      // +S Name = ""
       do {
          i = GetComments(code, i, tokens);
 
@@ -68,6 +70,24 @@ public class Tokenizer
             tokens.Add(fieldName);
          else
             throw new Exception("Expected param name");
+
+         (var equal, i) = GetEqual(code, i);
+         if (equal != null) {
+            tokens.Add(equal);
+            i = skipWs(code, i);
+            if (fieldType.Value == "I") {
+               //tokens.Add(new ParamType(fieldType.Value));
+               (int num, i) = GetI(code, i);
+               tokens.Add(new IntegerValue(num));
+            }
+            else if (fieldType.Value == "S") {
+               //tokens.Add(new ParamType(fieldType.Value));
+               (string str, i) = GetS(code, i);
+               tokens.Add(new StringValue(str));
+            }
+            else
+               throw new Exception($"Expected type. Actual {code[i]}");
+         }
 
          eof = GetEndOfFile(code, i);
          if (eof != null) {
@@ -216,6 +236,15 @@ public class Tokenizer
       return (new ParamName(text), i);
    }
 
+   (Equal, int) GetEqual(string code, int i) {
+      i = skipWs(code, i);
+      if (code[i] == '=') {
+         i++;
+         return (new Equal(), i);
+      }
+      return (null, i);
+   }
+
    (string, int) ReadAlphaUntil(string code, int i, params char[] ch) {
       var word = "";
       do {
@@ -238,9 +267,39 @@ public class Tokenizer
       } while (true);
    }
 
+   (int, int) GetI(string code, int i) {
+      i = skipWs(code, i);
+      string num = "";
+      do {
+         if (code.Length <= i || code[i] == '\r' || code[i] == '\n')
+            return (int.Parse(num), i);
+         if (!Regex.IsMatch(code[i].ToString(), "^[0-9]{1}$"))
+            throw new Exception($"Expected number. Actual {code[i]}");
+         num += code[i];
+         i++;
+      } while (true);
+   }
+
+   (string, int) GetS(string code, int i) {
+      i = skipWs(code, i);
+      string str = "";
+      if (code[i] == '"')
+         i++;
+      else
+         throw new Exception($"Expected double quote. Actual {code[i]}");
+
+      (str, i) = ReadUntil(code, i, '"');
+
+      if (code[i] == '"')
+         i++;
+      else
+         throw new Exception($"Expected double quote. Actual {code[i]}");
+
+      return (str, i);
+   }
+
    bool IsAlpha(string code, int i) {
-      var isAlpha = System.Text.RegularExpressions.
-         Regex.IsMatch(code[i].ToString(), "^[a-z|A-Z]{1}$");
+      var isAlpha = Regex.IsMatch(code[i].ToString(), "^[a-z|A-Z]{1}$");
       return isAlpha;
    }
 

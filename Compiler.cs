@@ -57,6 +57,7 @@ class Compiler {
       if (tokens[c] is OpenParen) {
          Next();
          var parameters = new List<(string t, string n)>();
+         var initializedFields = new List<(string t, string n, string v)>();
          do {
             if (tokens[c] is CloseParen) {
                Next();
@@ -97,6 +98,57 @@ class Compiler {
          } while (true);
 
          Line("", 1);
+
+         // fields
+         do {
+            Comments();
+
+            if (!(tokens[c] is Accessor or ParamType))
+               throwExpected<ParamType>();
+
+            string ac2 = "";
+            if (tokens[c] is Accessor a2) {
+               ac2 = a2.Value;
+               Next();
+            }
+            string pt2 = "";
+            if (tokens[c] is ParamType p2) {
+               pt2 = p2.Value;
+               Next();
+            } else
+               throwExpected<ParamType>();
+            string pn2 = "";
+            if (tokens[c] is ParamName pp2) {
+               pn2 = pp2.Value;
+               Next();
+            } else
+               throwExpected<ParamName>();
+
+            pt2 = ConvertType(pt2);
+            ac2 = ConvertAccessor(ac2);
+            Line($".field {ac2} {pt2} {pn2}", 1);
+
+            if (tokens[c] is Equal) {
+               Next();
+
+               if (tokens[c] is IntegerValue iv) {
+                  initializedFields.Add((pt2, pn2, iv.Value.ToString()));
+                  Next();
+               }
+               else if (tokens[c] is StringValue sv) {
+                  initializedFields.Add((pt2, pn2, sv.Value));
+                  Next();
+               }
+               else {
+                  throw new CompilerEx($"Expected initialized value. Actual {tokens[c].GetType()}");
+               }
+            }
+
+            if (tokens.Count <= c || tokens[c] is EndOfFile)
+               break;
+         } while (true);
+
+         Line("", 1);
          Line($".method public hidebysig specialname rtspecialname instance void", 1);
          Line($".ctor(", 1);
 
@@ -115,43 +167,26 @@ class Compiler {
             Line($"ldarg.{i}", 2);
             Line($"stfld {p.t} {ns}.{cl}::{p.n}", 2);
          }
+         foreach (var f in initializedFields) {
+            Line($"ldarg.0 // this", 2);
+            if (f.t == "int32") {
+               Line($"ldc.i4.{f.v}", 2);
+               Line($"stfld {f.t} {ns}.{cl}::{f.n}", 2);
+            }
+            else if (f.t == "string") {
+               Line($"ldstr \"{f.v}\"", 2);
+               Line($"stfld {f.t} {ns}.{cl}::{f.n}", 2);
+            }
+            else {
+               throw new CompilerEx($"Unknown type of initialized field. Actual {f.t}");
+            }
+         }
          Line($"nop", 2);
          Line($"ret", 2);
          Line("}", 1);
       }
       Line("");
-      // fields
-      do {
-         Comments();
-
-         if (!(tokens[c] is Accessor or ParamType))
-            throwExpected<ParamType>();
-
-         string ac2 = "";
-         if (tokens[c] is Accessor a2) {
-            ac2 = a2.Value;
-            Next();
-         }
-         string pt2 = "";
-         if (tokens[c] is ParamType p2) {
-            pt2 = p2.Value;
-            Next();
-         } else
-            throwExpected<ParamType>();
-         string pn2 = "";
-         if (tokens[c] is ParamName pp2) {
-            pn2 = pp2.Value;
-            Next();
-         } else
-            throwExpected<ParamName>();
-
-         pt2 = ConvertType(pt2);
-         ac2 = ConvertAccessor(ac2);
-         Line($".field {ac2} {pt2} {pn2}", 1);
-
-         if (tokens.Count <= c || tokens[c] is EndOfFile)
-            break;
-      } while (true);
+      
       Line("}");
       return (il, ns);
    }
