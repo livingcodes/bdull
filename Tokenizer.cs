@@ -22,8 +22,7 @@ public class Tokenizer
       endOfFile = GetEof(code, i);
       if (endOfFile != null) {
          tokens.Add(endOfFile);
-         return tokens;
-      }
+         return tokens; }
       
       if (code[i] != '(')
          throw new Exception("Expected (. Actual " + code[i]);
@@ -74,15 +73,20 @@ public class Tokenizer
          (var equal, i) = GetEqual(code, i);
          if (equal != null) {
             tokens.Add(equal);
+            string str = "";
             i = skipWs(code, i);
-            if (fieldType.Value == "I") {
+            if (fieldType.BdType == BdType.I) {
                (int num, i) = GetI(code, i);
                tokens.Add(new IntegerValue(num));
             }
-            else if (fieldType.Value == "S") {
-               (string str, i) = GetS(code, i);
+            else if (fieldType.BdType == BdType.S) {
+               (str, i) = GetS(code, i);
                var concats = GetConcats(str);
                tokens.Add(new StringValue(str, concats));
+            }
+            else if (fieldType.BdType == BdType.D) {
+               (str, i) = GetD(code, i);
+               tokens.Add(new DateValue(str));
             }
             else
                throw new Exception($"Expected type. Actual {code[i]}");
@@ -300,6 +304,28 @@ public class Tokenizer
          throw new Exception($"Expected double quote. Actual {code[i]}");
 
       (str, i) = ReadUntil(code, i, '"');
+      if (!IsEof(code, i) && code[i] == '"')
+         i++;
+      else
+         throw new Exception($"Expected double quote. Actual {code[i]}");
+
+      return (str, i);
+   }
+
+   (string, int) GetD(string code, int i) {
+      i = skipWs(code, i);
+
+      if (code[i] == 'D')
+         i++;
+      else
+         throw new Exception($"Expected double quote. Actual {code[i]}");
+
+      if (code[i] == '"')
+         i++;
+      else
+         throw new Exception($"Expected double quote. Actual {code[i]}");
+
+      (var str, i) = ReadUntil(code, i, '"');
       if (!IsEof(code, i) && code[i] == '"')
          i++;
       else

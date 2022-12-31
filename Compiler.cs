@@ -57,7 +57,7 @@ class Compiler {
       if (tokens[c] is OpenParen) {
          Next();
          var parameters = new List<(string t, string n)>();
-         var initializedFields = new List<(string t, string n, string v, List<(ConcatType ct, string cv)> c)>();
+         var initializedFields = new List<(string t, string n, IToken v)>();
          do {
             if (tokens[c] is CloseParen) {
                Next();
@@ -73,7 +73,7 @@ class Compiler {
             }
             string pt = "";
             if (tokens[c] is ParamType p) {
-               pt = p.Value;
+               pt = p.BdType;
                Next();
             }
             else
@@ -86,8 +86,8 @@ class Compiler {
             }
             else
                throwExpected<ParamName>();
-
-            pt = ConvertType(pt);
+            
+            pt = BdType.FromString(pt).ToIlType();
             ac = ConvertAccessor(ac);
             parameters.Add((pt, pn));
             Line($".field {ac} initonly {pt} {pn}", 1);
@@ -106,6 +106,7 @@ class Compiler {
             if (!(tokens[c] is Accessor or ParamType))
                throwExpected<ParamType>();
 
+            // +S Name
             string ac2 = "";
             if (tokens[c] is Accessor a2) {
                ac2 = a2.Value;
@@ -113,7 +114,7 @@ class Compiler {
             }
             string pt2 = "";
             if (tokens[c] is ParamType p2) {
-               pt2 = p2.Value;
+               pt2 = p2.BdType;
                Next();
             } else
                throwExpected<ParamType>();
@@ -124,24 +125,23 @@ class Compiler {
             } else
                throwExpected<ParamName>();
 
-            pt2 = ConvertType(pt2);
+            pt2 = BdType.FromString(pt2).ToIlType();
             ac2 = ConvertAccessor(ac2);
             Line($".field {ac2} {pt2} {pn2}", 1);
 
             if (tokens[c] is Equal) {
                Next();
-
                if (tokens[c] is IntegerValue iv) {
-                  initializedFields.Add((pt2, pn2, iv.Value.ToString(), null));
-                  Next();
-               }
+                  initializedFields.Add((pt2, pn2, iv));
+                  Next(); }
                else if (tokens[c] is StringValue sv) {
-                  initializedFields.Add((pt2, pn2, sv.Value, sv.Concats));
-                  Next();
-               }
-               else {
+                  initializedFields.Add((pt2, pn2, sv));
+                  Next(); }
+               else if (tokens[c] is DateValue dv) {
+                  initializedFields.Add((pt2, pn2, dv));
+                  Next(); }
+               else
                   throw new CompilerEx($"Expected initialized value. Actual {tokens[c].GetType()}");
-               }
             }
 
             if (tokens.Count <= c || tokens[c] is EndOfFile)
@@ -163,25 +163,28 @@ class Compiler {
          i = 0;
          foreach (var p in parameters) {
             i += 1;
+            Line("");
             Line($"ldarg.0 // this", 2);
             Line($"ldarg.{i}", 2);
             Line($"stfld {p.t} {ns}.{cl}::{p.n}", 2);
          }
          foreach (var f in initializedFields) {
+            Line("");
             Line($"ldarg.0 // this", 2);
-            if (f.t == "int32") {
-               Line($"ldc.i4.{f.v}", 2);
+            if (f.t == IlType.Int32) {
+               Line($"ldc.i4.{(IntegerValue)f.v}", 2);
                Line($"stfld {f.t} {ns}.{cl}::{f.n}", 2);
             }
-            else if (f.t == "string") {
-               if (f.c.Count == 0) {
-                  Line($"ldstr \"{f.v}\"", 2);
+            else if (f.t == IlType.String) {
+               var sv = (StringValue)f.v;
+               if (sv.Concats.Count == 0) {
+                  Line($"ldstr \"{sv}\"", 2);
                   Line($"stfld {f.t} {ns}.{cl}::{f.n}", 2);
                }
                else {
                   var pt = "";
                   Line("// concats", 2);
-                  foreach (var c in f.c) {
+                  foreach (var c in sv.Concats) {
                      if (c.ct == ConcatType.Variable) {
                         Line("ldarg.0", 2);
                         Line($"ldfld {f.t} {ns}.{cl}::{c.cv}", 2);
@@ -197,10 +200,19 @@ class Compiler {
                   Line("");
                }
             }
-            else {
-               throw new CompilerEx($"Unknown type of initialized field. Actual {f.t}");
+            else if (f.t == IlType.Date) {
+               var dv = (DateValue)f.v;
+               Line("");
+               Line($"ldc.i4 0x{dv.Date.Year.ToString("X")}", 2);
+               Line($"ldc.i4.{dv.Date.Month}", 2);
+               Line($"ldc.i4.{dv.Date.Day}", 2);
+               Line($"newobj instance void [System.Runtime]System.DateTime::.ctor(int32, int32, int32)", 2);
+               Line($"stfld {f.t} {ns}.{cl}::{f.n}", 2);
             }
+            else
+               throw new CompilerEx($"Unknown type of initialized field. Actual {f.t}");
          }
+         Line("");
          Line($"nop", 2);
          Line($"ret", 2);
          Line("}", 1);
@@ -221,16 +233,6 @@ class Compiler {
          } else
             cm = null;
       } while (cm != null);
-   }
-
-   string ConvertType(string bdType) {
-      var csType = 
-         bdType == "S"
-            ? "string"
-         : bdType == "I"
-            ? "int32"
-         : throw new Exception($"Type not recognized: {bdType}");
-      return csType;
    }
 
    string ConvertAccessor(string bdAccessor) {

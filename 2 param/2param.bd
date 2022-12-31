@@ -1,4 +1,5 @@
-﻿💬 todo: Date type
-App.User(+S First, -S Last)
+﻿💬 Set age
+App.User(+S First, +S Last, +D Birth)
    +S Name = "👉First 👉Last"
    +I Age = 3
+   +D Death = D"2093-02-04"
